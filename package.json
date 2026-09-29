@@ -1,0 +1,23 @@
+{
+  "name": "pantry-and-me",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "mobile": "npm run start --workspace @pantry-and-me/mobile",
+    "api": "npm run dev --workspace @pantry-and-me/api",
+    "dev": "npm run api",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "start": "npm run mobile"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "overrides": {
+    "react-native-gesture-handler": "2.32.0",
+    "react": "19.2.3",
+    "react-dom": "19.2.3"
+  }
+}
