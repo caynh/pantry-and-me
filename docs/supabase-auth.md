@@ -80,7 +80,24 @@ creating a second account. It is the Supabase equivalent of Firebase
 is required for Apple Sign In on device. Email and Google work in Expo Go.
 
 The Apple control is `AppleAuthenticationButton` (Apple's
-`ASAuthorizationAppleIDButton`). Do not replace it with a custom black button.
+`ASAuthorizationAppleIDButton`) on the welcome screen, the sign-up screen, and
+Settings. Do not replace it with a custom black button. The app sends a SHA-256
+nonce with the Apple identity token so Supabase can verify it.
+
+Sign in with Apple has to be offered wherever Google sign-in is offered. It
+only appears on iOS, and only in a development or TestFlight build — Expo Go
+cannot present it. On a simulator it stays hidden until that simulator is
+signed into an Apple ID.
+
+Before review, confirm all of the following, then sign in on a real iPhone:
+
+1. Apple provider enabled in Supabase, with the Services ID, team ID, key ID,
+   and private key from Apple Developer.
+2. Manual linking enabled.
+3. The iOS build includes the Sign in with Apple capability (`usesAppleSignIn`
+   in `app.json` turns this on at prebuild).
+4. Welcome, Sign up, and Settings (while anonymous) show Apple's button above
+   Google and email.
 
 ## 2. Run the database schema
 
@@ -132,11 +149,39 @@ npm run mobile
 | Identity already belongs to another account | Prompt, then merge or switch | Merge copies ingredients (deduped by name), recipes (by URL), and unions preferences |
 | Sign in while signed out | `signInWithPassword` / `signInWithIdToken` / OAuth | Loads that account |
 | Sign out | `signOut()` | Account in the cloud is untouched |
+| Delete account | `POST /api/account` with the user JWT, then local sign-out | Account, pantry, and Sign in with Apple token are removed |
 
 A pending merge snapshot is written to AsyncStorage *before* any session swap
 (`lib/pantry-migration.ts`). If the app is backgrounded mid-merge, launch
 resumes the same snapshot. The anonymous session is not signed out until the
 destination session is confirmed.
+
+## Account deletion
+
+Settings → Account → **Delete account** calls `POST /api/account`. The API
+checks the user's access token, then deletes that user with the Supabase
+**service role** key. Deleting the auth user cascades to `profiles`,
+`ingredients`, `user_preferences`, and `saved_recipes`. Supabase also revokes
+the Sign in with Apple refresh token when the Apple provider is configured.
+
+Add these to `apps/api/.env.local` (never to the mobile app):
+
+```env
+SUPABASE_URL=https://YOUR_PROJECT_REF.supabase.co
+SUPABASE_SERVICE_ROLE_KEY=eyJhbGciOi...
+```
+
+Restart the API after saving them. A review build whose API is missing the
+service role key will show "Account deletion is unavailable right now."
+
+## Privacy policy
+
+The policy is a page on the API: `/privacy`. Put that public HTTPS URL in App
+Store Connect, and set the same value as `EXPO_PUBLIC_PRIVACY_POLICY_URL` in
+`apps/mobile/.env` so the in-app link matches. Set `PRIVACY_CONTACT_EMAIL` on
+the API so the page includes a real contact address.
+
+After sign-in, including Continue without an account, the app opens the policy and stays there until the agreement box is checked. Settings can open the same policy again later. The hosted page is still the URL for App Store Connect. Signing out clears the agreement, so the next sign-in asks again.
 
 ## Troubleshooting
 
@@ -146,13 +191,14 @@ destination session is confirmed.
 | "Confirm your email..." | Turn off Confirm email for testing, or open the link |
 | "Wrong email or password" | Use Save this pantry first on some device |
 | Apple button missing | iOS only; `AppleAuthentication.isAvailableAsync()` is false on most simulators/web |
+| Apple sign-in fails immediately on device | Confirm the Apple provider secret in Supabase, and that the bundle ID is an allowed client ID |
 | Apple / Google create a second empty user | Enable Manual Linking |
 | Google sheet fails to return | Add `pantryandme://auth` to Supabase Redirect URLs; confirm the Web client redirect is the Supabase callback |
+| Delete account says it is unavailable | Add `SUPABASE_URL` and `SUPABASE_SERVICE_ROLE_KEY` to `apps/api/.env.local` and restart the API |
 | Ingredients stay on device with keys set | Account card will show the auth error — fix that first |
 | Saved recipes stay local | Run the second SQL migration |
 
 ## Not built yet
 
-- Account deletion UI (required before App Store if you store personal data)
 - Password reset email flow
 - Shared household pantries

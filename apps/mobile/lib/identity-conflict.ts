@@ -3,7 +3,7 @@ import { Alert } from 'react-native';
 export type IdentityProvider = 'apple' | 'google' | 'email';
 
 export type IdentityCredential =
-  | { provider: 'apple'; token: string }
+  | { provider: 'apple'; token: string; nonce: string }
   | { provider: 'google'; token?: string }
   | { provider: 'email'; email: string; password: string };
 

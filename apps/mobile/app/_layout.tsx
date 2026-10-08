@@ -16,6 +16,7 @@ import { SavedRecipesProvider } from '@/hooks/useSavedRecipes';
 import { ThemePreferenceProvider } from '@/hooks/useTheme';
 import { ExpirationRemindersSync } from '@/components/ExpirationRemindersSync';
 import { FirstRunExperience } from '@/components/FirstRunExperience';
+import { PrivacyAgreementProvider, usePrivacyAgreement } from '@/components/PrivacyAgreement';
 
 export {
   ErrorBoundary,
@@ -43,6 +44,7 @@ function RootLayoutInner() {
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <AuthProvider>
+        <PrivacyAgreementProvider>
         <PreferencesProvider>
           <IngredientsProvider>
             <SavedRecipesProvider>
@@ -52,6 +54,7 @@ function RootLayoutInner() {
             </SavedRecipesProvider>
           </IngredientsProvider>
         </PreferencesProvider>
+        </PrivacyAgreementProvider>
       </AuthProvider>
     </ThemeProvider>
   );
@@ -59,17 +62,32 @@ function RootLayoutInner() {
 
 function RootNavigator() {
   const { onboardingReady, onboardingComplete, status, isSignedIn } = useAuth();
+  const { ready: privacyReady, required: privacyRequired } = usePrivacyAgreement();
   const segments = useSegments();
   const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
 
   useEffect(() => {
-    if (!onboardingReady || status === 'loading') return;
+    if (!onboardingReady || !privacyReady || status === 'loading') return;
 
     const onWelcome = segments[0] === 'welcome';
     const onSignup = segments[0] === 'signup';
+    const onPrivacy = segments[0] === 'privacy';
+    const onConsent = segments[0] === 'privacy-consent';
     const onAuthGate = onWelcome || onSignup;
+
+    if (privacyRequired) {
+      if (!onConsent) router.replace('/privacy-consent');
+      return;
+    }
+
+    if (onConsent) {
+      router.replace('/(tabs)');
+      return;
+    }
+
+    if (onPrivacy) return;
     // A restored session keeps an already-signed-in user out of welcome even
     // though the dev flag cleared the persisted onboarding flag.
     const pastWelcome =
@@ -83,15 +101,15 @@ function RootNavigator() {
     if (pastWelcome && onAuthGate) {
       router.replace('/(tabs)');
     }
-  }, [isSignedIn, onboardingComplete, onboardingReady, router, segments, status]);
+  }, [isSignedIn, onboardingComplete, onboardingReady, privacyReady, privacyRequired, router, segments, status]);
 
   useEffect(() => {
-    if (onboardingReady && status !== 'loading') {
+    if (onboardingReady && privacyReady && status !== 'loading') {
       void SplashScreen.hideAsync();
     }
-  }, [onboardingReady, status]);
+  }, [onboardingReady, privacyReady, status]);
 
-  if (!onboardingReady || status === 'loading') {
+  if (!onboardingReady || !privacyReady || status === 'loading') {
     return (
       <View
         style={{
@@ -109,6 +127,11 @@ function RootNavigator() {
     <Stack>
       <Stack.Screen name="welcome" options={{ headerShown: false }} />
       <Stack.Screen name="signup" options={{ headerShown: false }} />
+      <Stack.Screen name="privacy" options={{ title: 'Privacy Policy' }} />
+      <Stack.Screen
+        name="privacy-consent"
+        options={{ title: 'Privacy Policy', headerBackVisible: false, gestureEnabled: false }}
+      />
       <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
       <Stack.Screen name="scan" options={{ title: 'Scan items', presentation: 'modal' }} />
       <Stack.Screen name="barcode" options={{ title: 'Scan barcode', presentation: 'modal' }} />

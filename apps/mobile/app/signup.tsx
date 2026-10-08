@@ -1,3 +1,4 @@
+import * as AppleAuthentication from 'expo-apple-authentication';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
@@ -9,6 +10,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Text, View } from '@/components/Themed';
+import { GoogleSignInButton } from '@/components/GoogleSignInButton';
 import { InlineError } from '@/components/InlineError';
 import { ScreenScroll } from '@/components/ScreenScroll';
 import { toUserError } from '@/lib/user-error';
@@ -22,22 +24,20 @@ export default function SignUpScreen() {
   const colors = Colors[colorScheme];
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { signUpWithEmailPassword, resolveIdentityConflict } = useAuth();
+  const { appleAvailable, signUpWithEmailPassword, signInWithApple, signInWithGoogle, resolveIdentityConflict } =
+    useAuth();
 
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const handleSignUp = async () => {
+  const run = async (action: () => Promise<void>) => {
     setBusy(true);
     setError(null);
 
     try {
-      const result = await runAuthAction(
-        () => signUpWithEmailPassword(email, password),
-        resolveIdentityConflict,
-      );
+      const result = await runAuthAction(action, resolveIdentityConflict);
       if (result === 'ok') {
         router.replace('/(tabs)');
       }
@@ -69,6 +69,27 @@ export default function SignUpScreen() {
         </Text>
 
         <RNView style={styles.form}>
+          {appleAvailable ? (
+            <AppleAuthentication.AppleAuthenticationButton
+              buttonType={AppleAuthentication.AppleAuthenticationButtonType.SIGN_UP}
+              buttonStyle={
+                colorScheme === 'dark'
+                  ? AppleAuthentication.AppleAuthenticationButtonStyle.WHITE
+                  : AppleAuthentication.AppleAuthenticationButtonStyle.BLACK
+              }
+              cornerRadius={8}
+              style={[styles.appleButton, { opacity: busy ? 0.6 : 1 }]}
+              onPress={() => {
+                if (busy) return;
+                void run(() => signInWithApple());
+              }}
+            />
+          ) : null}
+
+          <GoogleSignInButton disabled={busy} onPress={() => void run(() => signInWithGoogle())} />
+
+          <Text style={[styles.orLabel, { color: colors.muted }]}>or create an email account</Text>
+
           <TextInput
             autoCapitalize="none"
             autoCorrect={false}
@@ -90,7 +111,7 @@ export default function SignUpScreen() {
 
           <Pressable
             disabled={busy}
-            onPress={() => void handleSignUp()}
+            onPress={() => void run(() => signUpWithEmailPassword(email, password))}
             style={[
               styles.primaryButton,
               { backgroundColor: colors.tint, opacity: busy ? 0.6 : 1 },
@@ -159,6 +180,15 @@ const styles = StyleSheet.create({
   },
   form: {
     gap: 10,
+  },
+  appleButton: {
+    width: '100%',
+    height: 44,
+  },
+  orLabel: {
+    fontSize: 13,
+    textAlign: 'center',
+    marginVertical: 4,
   },
   input: {
     borderWidth: 1,

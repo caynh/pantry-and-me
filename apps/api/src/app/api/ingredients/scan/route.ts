@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import type { IngredientScanRequest } from '@pantry-and-me/shared';
-import { scanIngredientPhoto } from '@/lib/ingredient-scan';
+import { scanIngredientPhoto, resolveIngredientScanProvider } from '@/lib/ingredient-scan';
+import { liveProviderUnavailableMessage, mockProviderBlocked } from '@/lib/live-providers';
+import { providerFailureResponse } from '@/lib/provider-errors';
 
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp'];
 
@@ -26,12 +28,17 @@ export async function POST(request: Request) {
     const mimeType =
       body.mimeType && ALLOWED_MIME_TYPES.includes(body.mimeType) ? body.mimeType : 'image/jpeg';
 
+    if (mockProviderBlocked(resolveIngredientScanProvider())) {
+      return NextResponse.json({ error: liveProviderUnavailableMessage('scan') }, { status: 503 });
+    }
+
     const { provider, items } = await scanIngredientPhoto(imageBase64, mimeType);
 
     return NextResponse.json({ provider, items });
   } catch (error) {
     console.error('Ingredient scan failed:', error);
-    return NextResponse.json({ error: 'Ingredient scan did not finish. Try another photo.' }, { status: 500 });
+    const failure = providerFailureResponse(error, 'scan');
+    return NextResponse.json({ error: failure.error }, { status: failure.status });
   }
 }
 

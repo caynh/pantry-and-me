@@ -2,7 +2,13 @@
 
 The **Scan items** flow lets you photograph a fridge shelf, pantry, or product label and turn it into ingredients. The mobile app sends the photo to your Next.js API, which calls a vision model and returns suggested items. Nothing is saved until you confirm the list.
 
-Scanning works without any API key — the endpoint returns sample items so you can exercise the UI.
+Scanning works without an API key in local development — the endpoint returns sample items so you can exercise the UI. A production process (`next start`, or `REQUIRE_LIVE_PROVIDERS=true`) does **not** do that. If the OpenAI key is missing, or OpenAI rate-limits the request, the app shows an error instead of sample ingredients. App Review should hit the live provider. Check it with:
+
+```bash
+npm run verify:review --workspace @pantry-and-me/api
+```
+
+That confirms the key is accepted and SerpApi still has searches left. Add `--live` to spend one search and one OpenAI call. Add `--keys-only` to skip the local health check.
 
 ## Recommended: OpenAI vision
 
@@ -63,7 +69,8 @@ The model only reports `expirationDate` when a date is **legible in the photo** 
 
 | Issue | Fix |
 |-------|-----|
-| Always returns eggs/milk/spinach | That is the mock provider — add `OPENAI_API_KEY` and restart |
+| Always returns eggs/milk/spinach | That is the mock provider — add `OPENAI_API_KEY` and restart. Production will not return those samples |
+| `Photo scanning is busy` | OpenAI rate-limited or ran out of credit. The app does not substitute sample items |
 | `Image is too large` (413) | Requests are capped near 6 MB of image data; retake at lower quality |
 | Nothing detected | Get closer, improve lighting, photograph fewer items at once |
 | Timeout after 60s | Check the API is reachable; vision calls normally take 3–10s |

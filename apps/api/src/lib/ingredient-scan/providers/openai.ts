@@ -1,4 +1,5 @@
 import type { ScannedIngredient } from '@pantry-and-me/shared';
+import { ProviderRequestError, classifyProviderFailure } from '@/lib/provider-errors';
 
 const DEFAULT_MODEL = 'gpt-4o-mini';
 
@@ -51,10 +52,15 @@ export async function scanWithOpenAi(
     }),
   });
 
-  const data = (await response.json()) as OpenAiChatResponse;
+  const data = (await response.json().catch(() => ({}))) as OpenAiChatResponse;
 
   if (!response.ok || data.error) {
-    throw new Error(data.error?.message ?? `OpenAI request failed with HTTP ${response.status}`);
+    const message = data.error?.message ?? `OpenAI request failed with HTTP ${response.status}`;
+    throw new ProviderRequestError(
+      message,
+      response.status,
+      classifyProviderFailure(response.status, message),
+    );
   }
 
   const content = data.choices?.[0]?.message?.content;

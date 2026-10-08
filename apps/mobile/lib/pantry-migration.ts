@@ -55,6 +55,16 @@ export async function clearPendingSnapshot(): Promise<void> {
   await AsyncStorage.removeItem(SNAPSHOT_KEY);
 }
 
+/** Drops pantry copies on this device after the cloud account is deleted. */
+export async function clearDevicePantry(): Promise<void> {
+  await AsyncStorage.multiRemove([
+    LOCAL_INGREDIENTS_KEY,
+    LOCAL_RECIPES_KEY,
+    LOCAL_PREFERENCES_KEY,
+    SNAPSHOT_KEY,
+  ]);
+}
+
 async function readLocalJson<T>(key: string, fallback: T): Promise<T> {
   const raw = await AsyncStorage.getItem(key);
   if (!raw) return fallback;

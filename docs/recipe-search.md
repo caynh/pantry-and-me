@@ -64,7 +64,7 @@ You should see real recipe URLs from sites like AllRecipes or Serious Eats.
 | `RECIPE_SEARCH_PROVIDER` | No | Set to `mock` to force offline sample results |
 | `RECIPE_SEARCH_USE_SITE_FILTERS` | No | `true` (default) adds `site:allrecipes.com OR ...` to queries |
 
-Without `SERPAPI_API_KEY` the API returns **mock** results (`example.com` links) so the UI still works offline.
+Without `SERPAPI_API_KEY` the API returns **mock** results (`example.com` links) during local development so the UI still works offline. Production (`next start`, or `REQUIRE_LIVE_PROVIDERS=true`) returns an error instead of those samples, including when SerpApi is out of searches. Before App Review, run `npm run verify:review --workspace @pantry-and-me/api` and keep at least 20 searches left.
 
 Queries are capped at the first 8 ingredients and 5 exclusions, because Google ignores terms past roughly 32 words and the site filters already use several.
 
@@ -74,7 +74,8 @@ Queries are capped at the first 8 ingredients and 5 exclusions, because Google i
 
 | Issue | Fix |
 |-------|-----|
-| Mock results (`example.com`) | Add `SERPAPI_API_KEY` to `apps/api/.env.local` and restart API |
+| Mock results (`example.com`) | Add `SERPAPI_API_KEY` to `apps/api/.env.local` and restart API. Production will not serve these |
+| `Recipe search is busy` | SerpApi quota or rate limit. The app does not substitute sample recipes |
 | Verify script says missing credentials | Keys must be in `apps/api/.env.local`, not root `.env` |
 | Mobile can't search | Set `EXPO_PUBLIC_API_URL` to your computer's LAN IP on physical devices |
 | SerpApi quota exceeded | Free tier is 100/month; upgrade or wait for reset |

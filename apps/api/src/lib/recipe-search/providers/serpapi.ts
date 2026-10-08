@@ -1,4 +1,5 @@
 import type { RecipeSearchResult } from '@pantry-and-me/shared';
+import { ProviderRequestError, classifyProviderFailure } from '@/lib/provider-errors';
 
 interface SerpApiOrganicResult {
   title?: string;
@@ -47,10 +48,15 @@ export async function searchWithSerpApi(
   });
 
   const response = await fetch(`https://serpapi.com/search.json?${params}`);
-  const data = (await response.json()) as SerpApiResponse;
+  const data = (await response.json().catch(() => ({}))) as SerpApiResponse;
 
   if (!response.ok || data.error) {
-    throw new Error(data.error ?? `SerpApi request failed with HTTP ${response.status}`);
+    const message = data.error ?? `SerpApi request failed with HTTP ${response.status}`;
+    throw new ProviderRequestError(
+      message,
+      response.status,
+      classifyProviderFailure(response.status, message),
+    );
   }
 
   const normalizedIngredients = ingredients.map((item) => item.trim().toLowerCase());

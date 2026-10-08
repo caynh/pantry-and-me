@@ -124,6 +124,16 @@ export const DIETARY_OPTIONS: { id: DietaryRestriction; label: string }[] = [
   { id: 'nut-free', label: 'Nut-free' },
 ];
 
+export {
+  PRIVACY_POLICY_INTRO,
+  PRIVACY_POLICY_SECTIONS,
+  PRIVACY_POLICY_UPDATED,
+  privacyContactEmail,
+  privacyContactSentence,
+  type PrivacyBullet,
+  type PrivacySection,
+} from './privacy-policy';
+
 export const STORAGE_LOCATIONS: { id: StorageLocation; label: string }[] = [
   { id: 'pantry', label: 'Pantry' },
   { id: 'fridge', label: 'Fridge' },

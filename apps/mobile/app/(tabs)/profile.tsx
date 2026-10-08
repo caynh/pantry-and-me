@@ -1,4 +1,5 @@
 import * as AppleAuthentication from 'expo-apple-authentication';
+import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import {
   ActivityIndicator,
@@ -23,6 +24,7 @@ import { useThemePreference } from '@/hooks/useTheme';
 import { ensureReminderPermissions } from '@/lib/expiration-notifications';
 
 export default function ProfileScreen() {
+  const router = useRouter();
   const colorScheme = useColorScheme();
   const colors = Colors[colorScheme];
   const {
@@ -60,6 +62,7 @@ export default function ProfileScreen() {
     signInWithGoogle,
     resolveIdentityConflict,
     signOut,
+    deleteAccount,
   } = useAuth();
 
   const [mode, setMode] = useState<'save' | 'signin'>('save');
@@ -71,6 +74,7 @@ export default function ProfileScreen() {
   // 'signed_out' is on its way to welcome already, and 'loading'/'error' have
   // nothing to leave yet.
   const canSignOut = status === 'identified' || status === 'anonymous' || status === 'disabled';
+  const canDeleteAccount = status === 'identified' || status === 'anonymous';
 
   const runAuth = async (action: () => Promise<void>, successMessage: string) => {
     setBusy(true);
@@ -146,6 +150,36 @@ export default function ProfileScreen() {
     ]);
   };
 
+  const performDeleteAccount = async () => {
+    setBusy(true);
+    setFormError(null);
+
+    try {
+      await deleteAccount();
+    } catch (err) {
+      setFormError(toUserError(err, 'Could not delete your account. Try again.'));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete account?',
+      status === 'anonymous'
+        ? 'This permanently deletes this cloud pantry, including ingredients and saved recipes. You cannot undo this.'
+        : 'This permanently deletes your pantry&me account, including ingredients, saved recipes, and preferences. You cannot undo this.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete account',
+          style: 'destructive',
+          onPress: () => void performDeleteAccount(),
+        },
+      ],
+    );
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <ScreenScroll>
@@ -170,7 +204,7 @@ export default function ProfileScreen() {
           {status === 'anonymous' ? (
             <Text style={[styles.cardHint, { color: colors.muted }]}>
               Your pantry is backed up in the cloud, but only this device can reach it until you add
-              email or Apple Sign In.
+              email, Apple, or Google.
             </Text>
           ) : null}
           {status === 'error' ? (
@@ -297,7 +331,26 @@ export default function ProfileScreen() {
             </Pressable>
           ) : null}
 
+          {canDeleteAccount ? (
+            <Pressable
+              disabled={busy}
+              onPress={handleDeleteAccount}
+              style={[styles.signOutButton, { borderColor: colors.danger }]}>
+              <Text style={{ color: colors.danger, fontWeight: '700' }}>Delete account</Text>
+            </Pressable>
+          ) : null}
+
           {formError ? <InlineError message={formError} /> : null}
+        </RNView>
+
+        <RNView style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
+          <Text style={styles.cardTitle}>Privacy</Text>
+          <Text style={[styles.cardHint, { color: colors.muted }]}>
+            How photos, recipe searches, and your account are handled.
+          </Text>
+          <Pressable onPress={() => router.push('/privacy')} accessibilityRole="link">
+            <Text style={{ color: colors.tint, fontWeight: '700' }}>Privacy Policy</Text>
+          </Pressable>
         </RNView>
 
         <RNView style={[styles.card, { backgroundColor: colors.card, borderColor: colors.border }]}>
@@ -358,7 +411,7 @@ function describeSignOut(status: AuthStatus): {
       return {
         title: 'Sign out of this pantry?',
         message:
-          'This pantry has no email or Apple ID attached, so signing out gives up access to it for good. Save it with an email first if you want to keep it.',
+          'This pantry has no email, Apple ID, or Google account attached, so signing out gives up access to it for good. Save it first if you want to keep it.',
         confirm: 'Sign out anyway',
         destructive: true,
       };

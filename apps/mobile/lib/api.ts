@@ -17,6 +17,7 @@ async function postJson<TResponse>(
   path: string,
   body: unknown,
   timeoutMs: number,
+  headers?: Record<string, string>,
 ): Promise<TResponse> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
@@ -24,7 +25,7 @@ async function postJson<TResponse>(
   try {
     const response = await fetch(`${API_URL}${path}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...headers },
       body: JSON.stringify(body),
       signal: controller.signal,
     });
@@ -68,5 +69,18 @@ export function scanIngredientPhoto(
 export function lookupBarcode(request: BarcodeLookupRequest): Promise<BarcodeLookupResponse> {
   return postJson<BarcodeLookupResponse>('/api/ingredients/barcode', request, BARCODE_TIMEOUT_MS);
 }
+
+export function deleteRemoteAccount(accessToken: string): Promise<{ deleted: true }> {
+  return postJson<{ deleted: true }>(
+    '/api/account',
+    {},
+    30_000,
+    { Authorization: `Bearer ${accessToken}` },
+  );
+}
+
+/** Public URL for App Store Connect and the in-app Privacy Policy link. */
+export const PRIVACY_POLICY_URL =
+  process.env.EXPO_PUBLIC_PRIVACY_POLICY_URL ?? `${API_URL.replace(/\/$/, '')}/privacy`;
 
 export { API_URL };

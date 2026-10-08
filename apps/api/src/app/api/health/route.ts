@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { isBarcodeLookupConfigured, resolveBarcodeLookupProvider } from '@/lib/barcode-lookup';
 import { isIngredientScanConfigured, resolveIngredientScanProvider } from '@/lib/ingredient-scan';
+import { liveProvidersRequired } from '@/lib/live-providers';
 import { isRecipeSearchConfigured, resolveRecipeSearchProvider } from '@/lib/recipe-search';
 
 export async function GET() {
@@ -32,5 +33,8 @@ export async function GET() {
       configured: isBarcodeLookupConfigured(),
       mode: barcodeProvider === 'mock' ? 'mock' : 'live',
     },
+    liveProvidersRequired: liveProvidersRequired(),
+    readyForReview:
+      searchProvider !== 'mock' && scanProvider !== 'mock' && barcodeProvider !== 'mock',
   });
 }

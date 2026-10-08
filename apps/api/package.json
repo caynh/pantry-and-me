@@ -8,10 +8,13 @@
     "start": "next start",
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
-    "verify:search": "node scripts/verify-recipe-search.mjs"
+    "test": "node --experimental-strip-types --disable-warning=MODULE_TYPELESS_PACKAGE_JSON --test src/lib/live-providers.test.mts src/lib/provider-errors.test.mts src/lib/account-auth.test.mts",
+    "verify:search": "node scripts/verify-recipe-search.mjs",
+    "verify:review": "node scripts/verify-review-readiness.mjs"
   },
   "dependencies": {
     "@pantry-and-me/shared": "*",
+    "@supabase/supabase-js": "^2.117.2",
     "next": "16.3.0",
     "react": "19.2.8",
     "react-dom": "19.2.8"

@@ -37,7 +37,7 @@ pantry-and-me/
 - My Recipes favorites with notes
 - Dark mode toggle in Settings
 - On-device storage, so the app is fully usable before any cloud setup
-- Both external providers fall back to mock data when keys are missing
+- Both external providers fall back to mock data in local development when keys are missing. Production returns an error instead
 
 ## Run it locally
 
@@ -157,7 +157,6 @@ Without keys the app stays on device storage. With keys it signs in silently, mi
 ## Roadmap
 
 **Next up**
-- Account deletion (App Store requirement once accounts store personal data)
 - Password reset
 - Native date picker for expiration dates
 
@@ -165,6 +164,10 @@ Without keys the app stays on device storage. With keys it signs in silently, mi
 - Shared household pantry
 
 **Then — store launch**
+- Deploy the API and set `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`, and `PRIVACY_CONTACT_EMAIL`
+- Put the public `https://<api>/privacy` URL in App Store Connect and in `EXPO_PUBLIC_PRIVACY_POLICY_URL`
+- Run `npm run verify:review --workspace @pantry-and-me/api` against that API
+- Confirm Sign in with Apple on a real iPhone (welcome, sign up, and Settings)
 - TestFlight and Play internal testing
 - App Store and Play Store submission
 
@@ -175,16 +178,20 @@ Without keys the app stays on device storage. With keys it signs in silently, mi
 | `npm run mobile` | Start the Expo dev server |
 | `npm run api` | Start the Next.js API on port 3000 |
 | `npm run typecheck` | Typecheck every workspace |
+| `npm test` | Run API tests (mock fallback, provider errors, account-deletion auth) |
 | `npm run verify:search --workspace @pantry-and-me/api` | Check SerpApi credentials |
+| `npm run verify:review --workspace @pantry-and-me/api` | Check live keys, remaining SerpApi quota, and `/privacy` |
 
 ## API endpoints
 
 | Endpoint | Description |
 |----------|-------------|
-| `GET /api/health` | Version plus provider/mode for search, scanning, and barcodes |
+| `GET /api/health` | Version plus provider/mode for search, scanning, and barcodes. `readyForReview` is true only when none of them are mock |
 | `POST /api/recipes/search` | `{ ingredients, dietary?, excluded? }` → recipe article links |
 | `POST /api/ingredients/scan` | `{ imageBase64, mimeType? }` → suggested ingredients |
 | `POST /api/ingredients/barcode` | `{ barcode }` → product details, or `product: null` |
+| `POST /api/account` | Bearer token → permanently deletes that account |
+| `GET /privacy` | Privacy policy |
 
 ## Local tooling you need
 

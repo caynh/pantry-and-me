@@ -16,7 +16,11 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.caynh23.pantryandme",
-      "usesAppleSignIn": true
+      "usesAppleSignIn": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "pantry&me uses the camera to photograph food in your fridge or pantry and to scan barcodes on packaged food, so those items can be added to your ingredients list.",
+        "NSPhotoLibraryUsageDescription": "pantry&me uses photos you choose to identify food in a fridge, pantry, or package picture and add those items to your ingredients list."
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -46,15 +50,15 @@
       [
         "expo-image-picker",
         {
-          "cameraPermission": "pantry&me uses your camera to scan food items into your ingredients list.",
-          "photosPermission": "pantry&me reads photos you choose to scan food items into your ingredients list.",
+          "cameraPermission": "pantry&me uses the camera to photograph food in your fridge or pantry and to scan barcodes on packaged food, so those items can be added to your ingredients list.",
+          "photosPermission": "pantry&me uses photos you choose to identify food in a fridge, pantry, or package picture and add those items to your ingredients list.",
           "microphonePermission": false
         }
       ],
       [
         "expo-camera",
         {
-          "cameraPermission": "pantry&me uses your camera to scan barcodes on packaged food.",
+          "cameraPermission": "pantry&me uses the camera to photograph food in your fridge or pantry and to scan barcodes on packaged food, so those items can be added to your ingredients list.",
           "recordAudioAndroid": false
         }
       ],

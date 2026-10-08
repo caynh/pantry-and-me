@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import type { DietaryRestriction, RecipeSearchRequest } from '@pantry-and-me/shared';
-import { searchRecipeArticles } from '@/lib/recipe-search';
+import { resolveRecipeSearchProvider, searchRecipeArticles } from '@/lib/recipe-search';
+import { liveProviderUnavailableMessage, mockProviderBlocked } from '@/lib/live-providers';
+import { providerFailureResponse } from '@/lib/provider-errors';
 
 const ALLOWED_DIETARY: DietaryRestriction[] = [
   'vegetarian',
@@ -35,12 +37,17 @@ export async function POST(request: Request) {
       .filter(Boolean)
       .slice(0, 20);
 
+    if (mockProviderBlocked(resolveRecipeSearchProvider())) {
+      return NextResponse.json({ error: liveProviderUnavailableMessage('search') }, { status: 503 });
+    }
+
     const { query, results, provider } = await searchRecipeArticles(ingredients, dietary, excluded);
 
     return NextResponse.json({ query, results, provider });
   } catch (error) {
     console.error('Recipe search failed:', error);
-    return NextResponse.json({ error: 'Recipe search failed.' }, { status: 500 });
+    const failure = providerFailureResponse(error, 'search');
+    return NextResponse.json({ error: failure.error }, { status: failure.status });
   }
 }
 

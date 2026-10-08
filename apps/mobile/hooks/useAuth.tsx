@@ -4,6 +4,8 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ReactNode } from 'react';
 import { AppState, Platform } from 'react-native';
 import { ALWAYS_SHOW_WELCOME_WHEN_SIGNED_OUT } from '@/constants/Dev';
+import { createAppleNonce } from '@/lib/apple-nonce';
+import { deleteRemoteAccount } from '@/lib/api';
 import { startGoogleOAuth } from '@/lib/google-auth';
 import {
   IdentityInUseError,
@@ -15,6 +17,7 @@ import {
 import {
   applySnapshotToCurrentUser,
   captureAnonymousPantry,
+  clearDevicePantry,
   clearPendingSnapshot,
   loadPendingSnapshot,
   resumePendingMerge,
@@ -70,6 +73,8 @@ interface AuthContextValue {
   /** Skip account creation — starts an anonymous cloud session. */
   continueAnonymously: () => Promise<void>;
   signOut: () => Promise<void>;
+  /** Permanently deletes the cloud account and the pantry stored with it. */
+  deleteAccount: () => Promise<void>;
   /**
    * True when this session is a first-time signup or first continue-without-account.
    * Drives the welcome modal + tutorial on the main app.
@@ -376,19 +381,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const previous = await snapshotIfAnonymous();
     const previousUserId = previous?.fromUserId ?? null;
+    const { raw: nonce, hashed } = await createAppleNonce();
 
     const credential = await AppleAuthentication.signInAsync({
       requestedScopes: [
         AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
         AppleAuthentication.AppleAuthenticationScope.EMAIL,
       ],
+      nonce: hashed,
     });
 
     if (!credential.identityToken) {
       throw new Error('Apple sign-in did not finish. Try again.');
     }
 
-    const appleCredential: IdentityCredential = { provider: 'apple', token: credential.identityToken };
+    const appleCredential: IdentityCredential = {
+      provider: 'apple',
+      token: credential.identityToken,
+      nonce,
+    };
 
     // linkIdentity(..., token) is the Supabase equivalent of Firebase
     // linkWithCredential(): same UID, pantry rows stay put. signInWithIdToken
@@ -397,10 +408,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       ? await supabase.auth.linkIdentity({
           provider: 'apple',
           token: credential.identityToken,
+          nonce,
         })
       : await supabase.auth.signInWithIdToken({
           provider: 'apple',
           token: credential.identityToken,
+          nonce,
         });
 
     if (appleError) {
@@ -412,6 +425,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     if (!data.user) throw new Error('Apple sign-in did not finish. Try again.');
 
+    await saveAppleDisplayName(data.user.id, credential.fullName);
     await settleAfterIdentity(previousUserId, data.user.id);
     await finishIdentified(data.user, { firstRun: isNewlyCreatedUser(data.user) });
   }, [finishIdentified, settleAfterIdentity, snapshotIfAnonymous]);
@@ -471,6 +485,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const { data, error: appleError } = await supabase.auth.signInWithIdToken({
           provider: 'apple',
           token: conflict.credential.token,
+          nonce: conflict.credential.nonce,
         });
         if (appleError) throw new Error(describeAuthError(appleError));
         nextUserId = data.user?.id ?? null;
@@ -504,6 +519,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await resetOnboarding();
   }, [applyUser, resetOnboarding]);
 
+  const deleteAccount = useCallback(async () => {
+    if (!supabase) throw new Error('Cloud accounts are unavailable right now.');
+
+    setError(null);
+    const { data, error: sessionError } = await supabase.auth.getSession();
+    if (sessionError) throw new Error(describeAuthError(sessionError));
+
+    const token = data.session?.access_token;
+    if (!token) throw new Error('Sign in before deleting your account.');
+
+    await deleteRemoteAccount(token);
+
+    try {
+      await clearDevicePantry();
+    } catch {
+      // The account is already deleted. Keep going so this device does not stay signed in.
+    }
+
+    try {
+      // The server user is already gone, so only the session stored on this device remains.
+      await supabase.auth.signOut({ scope: 'local' });
+    } catch {
+      // Same as above: deletion succeeded even if the local session clear throws.
+    }
+
+    applyUser(null);
+    await resetOnboarding();
+  }, [applyUser, resetOnboarding]);
+
   const value = useMemo<AuthContextValue>(
     () => ({
       status,
@@ -526,6 +570,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       resolveIdentityConflict,
       continueAnonymously,
       signOut,
+      deleteAccount,
       firstRunWelcomePending,
       completeFirstRunWelcome,
     }),
@@ -534,6 +579,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       completeFirstRunWelcome,
       completeOnboarding,
       continueAnonymously,
+      deleteAccount,
       email,
       error,
       firstRunWelcomePending,
@@ -565,6 +611,26 @@ export function useAuth(): AuthContextValue {
   }
 
   return context;
+}
+
+async function saveAppleDisplayName(
+  userId: string,
+  fullName: AppleAuthentication.AppleAuthenticationFullName | null,
+) {
+  if (!supabase || !fullName) return;
+
+  const displayName = [fullName.givenName, fullName.familyName].filter(Boolean).join(' ').trim();
+  if (!displayName) return;
+
+  try {
+    await supabase.auth.updateUser({ data: { display_name: displayName, full_name: displayName } });
+    await supabase
+      .from('profiles')
+      .update({ display_name: displayName, updated_at: new Date().toISOString() })
+      .eq('id', userId);
+  } catch {
+    // Apple only sends the name once. A failed profile write should not undo sign-in.
+  }
 }
 
 function isNewlyCreatedUser(user: { created_at?: string | null }): boolean {
